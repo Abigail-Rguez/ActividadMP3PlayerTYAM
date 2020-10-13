@@ -2,30 +2,47 @@ package mx.uv.fiee.iinf.mp3player;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class DetailsActivity extends Activity {
+    public static final String Clv = "mx.uv.fiee.iinf.mp3player.DetailsActivity";
     MediaPlayer player;
     Thread posThread;
     Uri mediaUri;
+    ImageButton ImgButton;
+    SeekBar sbProgress;
     int pos;
+
+    TextView txtArtista, txtArchivo;
 
     @Override
     protected void onCreate (@Nullable Bundle savedInstanceState) {
         super.onCreate (savedInstanceState);
         setContentView (R.layout.activity_details);
 
-        SeekBar sbProgress = findViewById (R.id.sbProgress);
+        sbProgress= findViewById (R.id.sbProgress);
+        txtArtista = findViewById(R.id.Artista);
+        txtArchivo = findViewById(R.id.Archivo);
+
+        ImgButton = findViewById(R.id.ImgB);
+        AtomicReference<Drawable> drw = new AtomicReference<>(getResources().getDrawable(R.drawable.ic_pause_black_48dp, getTheme()));
+        ImgButton.setImageDrawable(drw.get());
         sbProgress.setOnSeekBarChangeListener (new MySeekBarChangeListener ());
 
         player = new MediaPlayer ();
@@ -45,70 +62,19 @@ public class DetailsActivity extends Activity {
             posThread.start ();
         });
 
-        Button btnAudio1 = findViewById (R.id.btnAudio1);
-        btnAudio1.setOnClickListener (v -> {
+        ImgButton.setOnClickListener(v-> {
 
-            if (player.isPlaying ()) {
-                posThread.interrupt ();
-                player.stop ();
-                player.seekTo (0);
-                sbProgress.setProgress (0);
-                pos = -1;
+            if(player.isPlaying()){
+                drw.set(getResources().getDrawable(R.drawable.ic_play_arrow_black_48dp, getTheme()));
+                player.pause();
+            }else{
+                drw.set(getResources().getDrawable(R.drawable.ic_pause_black_48dp, getTheme()));
+                player.start();
             }
-
-            mediaUri = Uri.parse ("android.resource://" + getBaseContext ().getPackageName () + "/" + R.raw.mr_blue_sky);
-
-            try {
-                player.setDataSource(getBaseContext (), mediaUri);
-                player.prepare ();
-                Toast.makeText (getApplicationContext (), "Now playing: Mr. Blue Sky", Toast.LENGTH_LONG).show ();
-            } catch (IOException ex) { ex.printStackTrace (); }
-
+            ImgButton.setImageDrawable(drw.get());
         });
-
-        Button btnAudio2 = findViewById (R.id.btnAudio2);
-        btnAudio2.setOnClickListener (v -> {
-
-            if (player.isPlaying ()) {
-                posThread.interrupt ();
-                player.stop ();
-                player.seekTo (0);
-                sbProgress.setProgress (0);
-                pos = -1;
-            }
-
-            mediaUri = Uri.parse ("android.resource://" + getBaseContext ().getPackageName () + "/" + R.raw.lake_shore_drive);
-
-            try {
-                player.setDataSource (getBaseContext (), mediaUri);
-                player.prepare ();
-                Toast.makeText (getApplicationContext (), "Now playing: Lake Shoe Drive", Toast.LENGTH_LONG).show ();
-            } catch (IOException ex) { ex.printStackTrace (); }
-
-        });
-
-        Button btnAudio3 = findViewById (R.id.btnAudio3);
-        btnAudio3.setOnClickListener (v -> {
-
-            if (player.isPlaying ()) {
-                posThread.interrupt ();
-                player.stop ();
-                player.seekTo (0);
-                sbProgress.setProgress (0);
-                pos = -1;
-            }
-
-            mediaUri = Uri.parse ("android.resource://" + getBaseContext ().getPackageName () + "/" + R.raw.fox_on_the_run);
-
-            try {
-                player.setDataSource (getBaseContext(), mediaUri);
-                player.prepare ();
-                Toast.makeText (getApplicationContext (), "Now playing: Fox On The Run", Toast.LENGTH_LONG).show ();
-            } catch (IOException ex) { ex.printStackTrace (); }
-
-        });
-
     }
+
 
     @Override
     protected void onSaveInstanceState (@NonNull Bundle outState) {
@@ -164,6 +130,19 @@ public class DetailsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume ();
+        if (player.isPlaying ()) {
+            posThread.interrupt ();
+            player.stop ();
+            player.seekTo (0);
+            sbProgress.setProgress (0);
+            pos = -1;
+        }
+        try {
+            player.setDataSource(getBaseContext (), mediaUri);
+            player.prepare ();
+        } catch (IOException ex) {
+            ex.printStackTrace ();
+        }
     }
 
     @Override
@@ -172,8 +151,20 @@ public class DetailsActivity extends Activity {
 
         Intent intent = getIntent ();
         if (intent != null) {
-            String audio = intent.getStringExtra ("AUDIO");
+            String audio = intent.getStringExtra (Clv);
             Toast.makeText (getBaseContext(), audio, Toast.LENGTH_LONG).show ();
+
+            String []  Clums = {
+                    MediaStore.Audio.Media.DISPLAY_NAME,MediaStore.Audio.Artists.ARTIST
+            };
+            Cursor returnCursor = getContentResolver().query(mediaUri,Clums,null,null,null);
+
+            int NDisplay = returnCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME);
+            int NArtista = returnCursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST);
+            returnCursor.moveToFirst();
+
+            txtArtista.setText(returnCursor.getString(NArtista));
+            txtArchivo.setText(returnCursor.getString(NDisplay));
         }
 
     }
@@ -183,9 +174,14 @@ public class DetailsActivity extends Activity {
         @Override
         public void onProgressChanged (SeekBar seekBar, int i, boolean b) {
             if (b) {
-                player.pause ();
+                boolean Ban = false;
+                if(player.isPlaying()) {
+                    player.pause();
+                    Ban=true;
+                }
                 player.seekTo (i);
-                player.start ();
+                if(Ban)
+                    player.start ();
             }
         }
 
